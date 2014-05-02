@@ -1,6 +1,5 @@
 package main
 
-//import "fmt"
 import "strings"
 
 type Atom struct {
@@ -8,9 +7,15 @@ type Atom struct {
 	args []string
 }
 
-func createAtom(name string, args []string) *Atom {
+func createAtom(fact string) *Atom {
 	var a Atom
-	a.name = name
+	ss := strings.Split(fact, "(")
+	a.name = ss[0]
+	rest := strings.Trim(ss[1], ")")
+	args := strings.Split(rest, ",")
+	for i, arg := range args {
+		args[i] = strings.Trim(arg, " \"")
+	}
 	a.args = args
 	return &a
 }
@@ -33,24 +38,37 @@ type Rule struct {
 	body [](*Atom)
 }
 
-func createRule(atoms [](*Atom)) *Rule {
+func createRule(rule string) *Rule {
 	var r Rule
-	r.head = atoms[0]
-	r.body = atoms[1:]
+	ss := strings.Split(rule, "<-")
+	head := strings.Trim(ss[0], ". ")
+	r.head = createAtom(head)
+
+	if len(ss) > 1 {
+		body := strings.Trim(ss[1], ". ")
+		args := strings.Split(body, ",")
+		var atoms [](*Atom)
+		for _, arg := range args {
+			atoms = append(atoms, createAtom(strings.Trim(arg, "\" ")))
+		}
+		r.body = atoms
+	}
 	return &r
 }
 
 func (self *Rule) toString() string {
 	var s string
-	s = self.head.toString() + " <- "
-	for i, a := range self.body {
-		s += a.toString()
-		if i == len(self.body) - 1 {
-			s += "."
-		} else {
-			s += ", "
+	s = self.head.toString()
+	if self.body != nil {
+		s += " <- "
+		for i, a := range self.body {
+			s += a.toString()
+			if i != len(self.body) - 1 {
+				s += ", "
+			}
 		}
 	}
+	s += "."
 	return s
 }
 

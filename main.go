@@ -15,10 +15,11 @@ func main() {
 	l1.connect(s1, s2)
 
 	// Create data sources
-	rules := [](*Rule){createRule([](*Atom){createAtom("location", []string{"Westwood"})}),
-		createRule([](*Atom){createAtom("location", []string{"Wilshire"})}),
-		createRule([](*Atom){createAtom("location", []string{"National"})}),
-		createRule([](*Atom){createAtom("location", []string{"Sepulveda"})})}
+	rules := [](*Rule){createRule("location(\"Westwood\")."),
+		createRule("location(\"Wilshire\")."),
+		createRule("location(\"National\")."),
+		createRule("location(\"Sepulveda\")."),
+	}
 	d1 := createSource("d1", rules)
 
 	// Add data sources to solvers
@@ -28,7 +29,7 @@ func main() {
 	s1.addForwardingEntry("location", s2)
 
 	// Create request
-	r1 := createRequest("r1", createAtom("location", []string{"?X"}))
+	r1 := createRequest("r1", createAtom("location(\"?X\")"))
 
 	// Add request to a solver
 	s1.addRequest(r1)
