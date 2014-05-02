@@ -1,4 +1,4 @@
-cs239_dds
+CS239 Course Project: Distributed Datalog Solver
 =========
 
-Simple Simulator for Distributed Datalog Solver
+A simple network simulator for Distributed Datalog Solver implemented in Google Go.
