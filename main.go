@@ -15,16 +15,20 @@ func main() {
 	l1.connect(s1, s2)
 
 	// Create data sources
-	d1 := createSource("d1", "test", "test data")
+	rules := [](*Rule){createRule([](*Atom){createAtom("location", []string{"Westwood"})}),
+		createRule([](*Atom){createAtom("location", []string{"Wilshire"})}),
+		createRule([](*Atom){createAtom("location", []string{"National"})}),
+		createRule([](*Atom){createAtom("location", []string{"Sepulveda"})})}
+	d1 := createSource("d1", rules)
 
 	// Add data sources to solvers
 	s2.addSource(d1)
 
 	// Configure FIB in solvers
-	s1.addForwardingEntry("test", s2)
+	s1.addForwardingEntry("location", s2)
 
 	// Create request
-	r1 := createRequest("r1", "test")
+	r1 := createRequest("r1", createAtom("location", []string{"?X"}))
 
 	// Add request to a solver
 	s1.addRequest(r1)

@@ -6,16 +6,16 @@ import "fmt"
 
 type Request struct {
 	id string
-	name string
+	query *Atom
 	in chan *Packet
 	out chan *Packet
 	done chan int
 }
 
-func createRequest(id string, name string) *Request {
+func createRequest(id string, query *Atom) *Request {
 	var r Request
 	r.id = id
-	r.name = name
+	r.query = query
 	r.in = make(chan *Packet)
 	r.out = make(chan *Packet)
 	r.done = make(chan int)
@@ -24,9 +24,10 @@ func createRequest(id string, name string) *Request {
 
 func (self *Request) run() {
 	var pkt Packet
-	pkt.name = self.name
+	pkt.query = self.query
+	fmt.Println(self.id + ": ?" + self.query.toString())
 	self.out <- &pkt
 	ans := <-self.in
-	fmt.Println("Answer: name=" + ans.name + ", data=" + ans.data)
+	fmt.Println(self.id + ": " + ans.result)
 	self.done <- 0
 }

@@ -58,31 +58,33 @@ func (self *Solver) run() {
 	for id, f := range self.ift {
 		go func(id string, f *Interface) {
 			pkt := <-f.in
-			fmt.Println(self.id + ": name=" + pkt.name + ", data=" + pkt.data + " from " + id)
+			hint := pkt.query.name
 
-			if pkt.data == "" { // This is request packet
+			if pkt.result == "" { // This is request packet
+				fmt.Println(self.id + ": ?" + pkt.query.toString() + " from " + id)
 				//TODO: Lookup rules
 				
 				// Lookup fib
-				nexthop, ok := self.fib[pkt.name]
+				nexthop, ok := self.fib[hint]
 				if ok {
 					fmt.Println(self.id + ": nexthop is " + nexthop)
 					of := self.ift[nexthop]
 					of.out <- pkt
 					
 					// Record in prt
-					self.prt[pkt.name] = id
+					self.prt[hint] = id
 				}
 			} else { // This is response packet
+				fmt.Println(self.id + ": " + pkt.toString() + " from " + id)
 				// Lookup prt
-				nexthop, ok := self.prt[pkt.name]
+				nexthop, ok := self.prt[hint]
 				if ok {
 					fmt.Println(self.id + ": consume request from " + nexthop)
 					of := self.ift[nexthop]
 					of.out <- pkt
 
 					// Clear prt
-					delete(self.prt, pkt.name)
+					delete(self.prt, hint)
 				}
 			}
 		}(id, f)
