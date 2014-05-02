@@ -16,19 +16,7 @@ func createLink(id string) *Link {
 	return &l
 }
 
-type Interface struct {
-	in chan *Packet
-	out chan *Packet
-}
-
 func (self *Link) connect(s1 *Solver, s2 *Solver) {
-	var s1_if Interface
-	s1_if.in = self.c1
-	s1_if.out = self.c2
-	s1.ift[s2.id] = &s1_if
-
-	var s2_if Interface
-	s2_if.in = self.c2
-	s2_if.out = self.c1
-	s2.ift[s1.id] = &s2_if
+	s1.addInterface(s2.id, self.c1, self.c2)
+	s2.addInterface(s1.id, self.c2, self.c1)
 }

@@ -21,6 +21,11 @@ func createSolver(id string) *Solver {
 	return &s
 }
 
+type Interface struct {
+	in chan *Packet
+	out chan *Packet
+}
+
 func (self *Solver) addInterface(id string, in chan *Packet, out chan *Packet) {
 	var f Interface
 	f.in = in
