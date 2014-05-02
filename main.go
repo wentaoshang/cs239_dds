@@ -24,7 +24,7 @@ func main() {
 	s1.addForwardingEntry("test", s2)
 
 	// Create request
-	r1 := createRequest("r1")
+	r1 := createRequest("r1", "test")
 
 	// Add request to a solver
 	s1.addRequest(r1)
