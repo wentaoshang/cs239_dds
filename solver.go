@@ -9,7 +9,7 @@ type Solver struct {
 	rule map[string]([]string)
 	fib map[string]string
 	prt map[string]string
-	link map[string](*Channel)
+	ift map[string](*Interface)
 }
 
 func createSolver(id string) *Solver {
@@ -17,15 +17,19 @@ func createSolver(id string) *Solver {
 	s.id = id
 	s.fib = make(map[string]string)
 	s.prt = make(map[string]string)
-	s.link = make(map[string](*Channel))
+	s.ift = make(map[string](*Interface))
 	return &s
 }
 
+func (self *Solver) addInterface(id string, in chan *Packet, out chan *Packet) {
+	var f Interface
+	f.in = in
+	f.out = out
+	self.ift[id] = &f
+}
+
 func (self *Solver) addSource(src *Source) {
-	var c Channel
-	c.in = src.out
-	c.out = src.in
-	self.link[src.id] = &c
+	self.addInterface(src.id, src.out, src.in)
 	self.fib[src.name] = src.id
 }
 
@@ -34,7 +38,7 @@ func (self *Solver) addRule(s string, r []string) {
 }
 
 func (self *Solver) addForwardingEntry(data string, nexthop *Solver) {
-	if _, ok := self.link[nexthop.id]; !ok {
+	if _, ok := self.ift[nexthop.id]; !ok {
 		// Don't add this fib entry if the nexthop is not in link table
 		return
 	}
@@ -42,16 +46,13 @@ func (self *Solver) addForwardingEntry(data string, nexthop *Solver) {
 }
 
 func (self *Solver) addRequest(req *Request) {
-	var c Channel
-	c.in = req.out
-	c.out = req.in
-	self.link[req.id] = &c
+	self.addInterface(req.id, req.out, req.in)
 }
 
 func (self *Solver) run() {
-	for id, c := range self.link {
-		go func(id string, c *Channel) {
-			pkt := <-c.in
+	for id, f := range self.ift {
+		go func(id string, f *Interface) {
+			pkt := <-f.in
 			fmt.Println(self.id + ": name=" + pkt.name + ", data=" + pkt.data + " from " + id)
 
 			if pkt.data == "" { // This is request packet
@@ -61,8 +62,8 @@ func (self *Solver) run() {
 				nexthop, ok := self.fib[pkt.name]
 				if ok {
 					fmt.Println(self.id + ": nexthop is " + nexthop)
-					oc := self.link[nexthop]
-					oc.out <- pkt
+					of := self.ift[nexthop]
+					of.out <- pkt
 					
 					// Record in prt
 					self.prt[pkt.name] = id
@@ -72,13 +73,13 @@ func (self *Solver) run() {
 				nexthop, ok := self.prt[pkt.name]
 				if ok {
 					fmt.Println(self.id + ": consume request from " + nexthop)
-					oc := self.link[nexthop]
-					oc.out <- pkt
+					of := self.ift[nexthop]
+					of.out <- pkt
 
 					// Clear prt
 					delete(self.prt, pkt.name)
 				}
 			}
-		}(id, c)
+		}(id, f)
 	}
 }
