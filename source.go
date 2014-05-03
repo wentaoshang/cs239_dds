@@ -22,26 +22,18 @@ func createSource(id string, data [](*Rule)) *Source {
 	return &s
 }
 
-func mapToString(m map[string]string) string {
-	var s string
-	for key, val := range m {
-		s += key + " = " + val + ", "
-	}
-	return s
-}
-
 func (self *Source) run() {
 	pkt := <-self.in
 	fmt.Println(self.id + ": search for " + pkt.query.toString())
 
-	pkt.result = "NULL"
+	pkt.result = nil
 	for _, d := range self.data {
 		res, ok := d.unify(pkt.query)
 		if ok {
-			pkt.result = mapToString(res)
+			pkt.result = res
 			break;
 		}
 	}
-	fmt.Println(self.id + ": " + pkt.result)
+	fmt.Println(self.id + ": " + pkt.resultToString())
 	self.out <- pkt
 }

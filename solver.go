@@ -60,7 +60,7 @@ func (self *Solver) run() {
 			pkt := <-f.in
 			hint := pkt.query.name
 
-			if pkt.result == "" { // This is request packet
+			if pkt.result == nil { // This is request packet
 				fmt.Println(self.id + ": ?" + pkt.query.toString() + " from " + id)
 				//TODO: Lookup rules
 				

@@ -25,9 +25,9 @@ func createRequest(id string, query *Atom) *Request {
 func (self *Request) run() {
 	var pkt Packet
 	pkt.query = self.query
-	fmt.Println(self.id + ": ?" + self.query.toString())
+	fmt.Println(self.id + ": ?" + pkt.queryToString())
 	self.out <- &pkt
 	ans := <-self.in
-	fmt.Println(self.id + ": " + ans.result)
+	fmt.Println(self.id + ": " + ans.resultToString())
 	self.done <- 0
 }
