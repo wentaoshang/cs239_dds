@@ -15,10 +15,10 @@ func main() {
 	l1.connect(s1, s2)
 
 	// Create data sources
-	rules := [](*Rule){createRule("location(\"Westwood\")."),
-		createRule("location(\"Wilshire\")."),
-		createRule("location(\"National\")."),
-		createRule("location(\"Sepulveda\")."),
+	rules := [](*Rule){createRule("location(Westwood)."),
+		createRule("location(Wilshire)."),
+		createRule("location(National)."),
+		createRule("location(Sepulveda)."),
 	}
 	d1 := createSource("d1", rules)
 
@@ -28,11 +28,11 @@ func main() {
 	// Configure FIB in solvers
 	s1.addForwardingEntry(d1.cname, s2)
 
-	s1.addRule("loc(\"?X\") <- loc2(\"?X\").")
-	s1.addRule("loc2(\"?X\") <- location(\"?X\").")
+	s1.addRule("loc(?X) <- loc2(?X).")
+	s1.addRule("loc2(?X) <- location(?X).")
 
 	// Create request
-	r1 := createRequest("r1", createAtom("loc(\"?X\")"))
+	r1 := createRequest("r1", createAtom("loc(?X)"))
 
 	// Add request to a solver
 	s1.addRequest(r1)
