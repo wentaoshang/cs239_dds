@@ -150,7 +150,9 @@ func consumePendingRequest(s *Solver, query *Atom, result map[string]string, fro
 				pr.results = result
 			} else {
 				for key, val := range pr.results {
-					pr.results[key] = result[val]
+					if val2, ok := result[val]; ok {
+						pr.results[key] = val2
+					}
 				}
 			}
 			delete(pr.depend, from.toString())
