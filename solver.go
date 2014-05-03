@@ -12,8 +12,8 @@ type Interface struct {
 type PendingRequest struct {
 	query *Atom
 	solve *Atom
-	depend map[string]int
-	results map[string]string
+	depend map[string]int  // Dependency list of rules
+	results map[string]string  // Partial unification result
 	origin string  // For now, assume only one requester for each query
 }
 
@@ -69,19 +69,19 @@ func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
 	// Lookup rule cache
 	foundRule := false
 	for _, rule := range s.rc {
-		_, match := rule.unify(query)
+		res, match := rule.unify(query)
 		if match {
 			foundRule = true
-			fmt.Println(s.id + ": ?" + query.toString() + " matches rule " + rule.toString())
+			fmt.Println(s.id + ": ?" + query.toString() + " matches rule " + rule.toString() + " with " + mapToString(res))
 			// Record query in prt with dependencies
 			var pr PendingRequest
 			pr.query = query
 			pr.solve = solve
 			pr.depend = make(map[string]int)
-			pr.results = make(map[string]string)
 			for i, a := range rule.body {
 				pr.depend[a.toString()] = i
 			}
+			pr.results = res
 			pr.origin = origin
 			s.prt[query.toString()] = &pr
 
@@ -103,7 +103,6 @@ func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
 	pr.query = query
 	pr.solve = solve
 	pr.origin = origin
-	pr.results = make(map[string]string)
 	s.prt[query.toString()] = &pr
 
 	// Lookup fib and forward
@@ -124,30 +123,35 @@ func consumePendingRequest(s *Solver, query *Atom, result map[string]string, fro
 	if ok {
 		if query.toString() == from.toString() {
 			// Consume the query using its own result
-			fmt.Println(s.id + ": consume ?" + query.toString())
+			fmt.Println(s.id + ": consume ?" + query.toString() + " with " + mapToString(result))
+
 			// Delete query from prt
 			delete(s.prt, query.toString())
 
 			if pr.solve != nil {
 				// This query is a dependency of another query
-				fmt.Println(s.id + ": " + query.toString() + " satisfies a dependency of ?" + pr.solve.toString())
+				fmt.Println(s.id + ": ?" + query.toString() + " satisfies a dependency of ?" + pr.solve.toString())
 				// Pass the result up
 				consumePendingRequest(s, pr.solve, result, query)
 			} else {
-				// This query comes from the network
-				fmt.Println(s.id + ": send result back to " + pr.origin)
+				// This query doesn't solve other queries
 				of := s.ift[pr.origin]  // ASSERT: pr.origin should not be empty if pr.solve is nil
 				// Send result back
 				var pkt Packet
 				pkt.query = query
 				pkt.result = result
+				fmt.Println(s.id + ": send " + pkt.toString() + " back to " + pr.origin)
 				of.out <- &pkt
 			}
 		} else {
 			// A dependency is resolved
 			// Copy the result and clear the dependency
-			for key, val := range result {
-				pr.results[key] = val
+			if pr.results == nil {
+				pr.results = result
+			} else {
+				for key, val := range pr.results {
+					pr.results[key] = result[val]
+				}
 			}
 			delete(pr.depend, from.toString())
 
