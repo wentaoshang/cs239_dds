@@ -26,10 +26,13 @@ func main() {
 	s2.addSource(d1)
 
 	// Configure FIB in solvers
-	s1.addForwardingEntry("location", s2)
+	s1.addForwardingEntry(d1.cname, s2)
+
+	s1.addRule("loc(\"?X\") <- loc2(\"?X\").")
+	s1.addRule("loc2(\"?X\") <- location(\"?X\").")
 
 	// Create request
-	r1 := createRequest("r1", createAtom("location(\"?X\")"))
+	r1 := createRequest("r1", createAtom("loc(\"?X\")"))
 
 	// Add request to a solver
 	s1.addRequest(r1)

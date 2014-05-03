@@ -1,6 +1,7 @@
 package main
 
 import "strings"
+import "strconv"
 
 type Atom struct {
 	name string
@@ -30,6 +31,27 @@ func (self *Atom) toString() string {
 		}
 	}
 	s += ")"
+	return s
+}
+
+func (self *Atom) getName() string {
+	var s string
+	s = self.name + "(" + strconv.Itoa(len(self.args)) + ")"
+	return s
+}
+
+// Generate canonical string for the query
+// Variables are replaced by placeholders
+func (self *Atom) toCString() string {
+	var s string
+	s = self.name + "-"
+	for i, arg := range self.args {
+		if strings.HasPrefix(arg, "?") {
+			s += "?" + string(i) + "-"
+		} else {
+			s += arg + "-"
+		}
+	}
 	return s
 }
 
