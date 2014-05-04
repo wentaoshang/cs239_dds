@@ -59,6 +59,7 @@ func (self *Solver) addForwardingEntry(cname string, nexthop *Solver) {
 		return
 	}
 	self.fib[cname] = nexthop.id
+	fmt.Println(self.id + ": add forwarding entry " + cname + " -> " + nexthop.id)
 }
 
 func (self *Solver) addRequest(req *Request) {
