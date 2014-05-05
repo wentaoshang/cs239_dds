@@ -12,7 +12,7 @@ func mapToString(m map[string]string) string {
 	for key, val := range m {
 		s += key + " = " + val + ", "
 	}
-	return s
+	return s[0:len(s)-2]
 }
 
 func (self *Packet) queryToString() string {
