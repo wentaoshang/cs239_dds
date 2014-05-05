@@ -12,11 +12,13 @@ type Source struct {
 	out chan *Packet
 }
 
-func createSource(id string, data [](*Rule)) *Source {
+func createSource(id string, data []string) *Source {
 	var s Source
 	s.id = id
-	s.data = data
-	s.cname = data[0].head.getName()
+	for _, d := range data {
+		s.data = append(s.data, createRule(d))
+	}
+	s.cname = s.data[0].head.getName()
 	s.in = make(chan *Packet)
 	s.out = make(chan *Packet)
 	return &s

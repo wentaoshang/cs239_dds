@@ -12,10 +12,10 @@ type Request struct {
 	done chan int
 }
 
-func createRequest(id string, query *Atom) *Request {
+func createRequest(id string, query string) *Request {
 	var r Request
 	r.id = id
-	r.query = query
+	r.query = createAtom(query)
 	r.in = make(chan *Packet)
 	r.out = make(chan *Packet)
 	r.done = make(chan int)

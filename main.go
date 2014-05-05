@@ -15,10 +15,10 @@ func main() {
 	l1.connect(s1, s2)
 
 	// Create data sources
-	rules := [](*Rule){createRule("location(Westwood)."),
-		createRule("location(Wilshire)."),
-		createRule("location(National)."),
-		createRule("location(Sepulveda)."),
+	rules := []string{"location(Westwood).",
+		"location(Wilshire).",
+		"location(National).",
+		"location(Sepulveda).",
 	}
 	d1 := createSource("d1", rules)
 
@@ -32,7 +32,7 @@ func main() {
 	s1.addRule("loc2(?L) <- location(?L).")
 
 	// Create request
-	r1 := createRequest("r1", createAtom("loc(?X)"))
+	r1 := createRequest("r1", "loc(?X)")
 
 	// Add request to a solver
 	s1.addRequest(r1)
