@@ -19,8 +19,8 @@ func createSource(id string, data []string) *Source {
 		s.data = append(s.data, createRule(d))
 	}
 	s.cname = s.data[0].head.getName()
-	s.in = make(chan *Packet)
-	s.out = make(chan *Packet)
+	s.in = make(chan *Packet, 2)
+	s.out = make(chan *Packet, 2)
 	return &s
 }
 

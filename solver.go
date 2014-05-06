@@ -48,6 +48,13 @@ func (self *Solver) addSource(src *Source) {
 	self.addInterface(src.id, src.out, src.in)
 	self.fib[src.cname] = createRoute(src.id, 0)  // Attached source has a routing metric of 0
 	fmt.Println(self.id + ": add data source " + src.cname)
+	// Triggered update
+	for i, _ := range self.ift {
+		if strings.HasPrefix(i, "s") {
+			self.announceFIB(i, src.cname, 0)
+		}
+	}
+	go self.waitForNonSolver(src.id, self.ift[src.id])
 }
 
 func (self *Solver) addRule(r string) {
@@ -67,16 +74,17 @@ func (self *Solver) addForwardingEntry(cname string, nexthop *Solver, metric int
 
 func (self *Solver) addRequest(req *Request) {
 	self.addInterface(req.id, req.out, req.in)
+	go self.waitForNonSolver(req.id, self.ift[req.id])
 }
 
-func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
+func (self *Solver) solveAndForward(origin string, query *Atom, solve *Atom) {
 	// Lookup rule cache
 	foundRule := false
-	for _, rule := range s.rc {
+	for _, rule := range self.rc {
 		res, match := rule.unify(query)
 		if match {
 			foundRule = true
-			fmt.Println(s.id + ": ?" + query.toString() + " matches rule " + rule.toString() + " with " + mapToString(res))
+			fmt.Println(self.id + ": ?" + query.toString() + " matches rule " + rule.toString() + " with " + mapToString(res))
 			// Record query in prt with dependencies
 			var pr PendingRequest
 			pr.query = query
@@ -87,10 +95,10 @@ func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
 			}
 			pr.results = res
 			pr.origin = origin
-			s.prt[query.toString()] = &pr
+			self.prt[query.toString()] = &pr
 
 			for _, a := range rule.body {
-				solveAndForward(s, "", a, query)
+				self.solveAndForward("", a, query)
 			}
 		}
 	}
@@ -100,21 +108,21 @@ func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
 	}
 
 	// No match in rule table
-	fmt.Println(s.id + ": no rule for ?" + query.toString())
+	fmt.Println(self.id + ": no rule for ?" + query.toString())
 
 	// Record query in prt, without dependencies
 	var pr PendingRequest
 	pr.query = query
 	pr.solve = solve
 	pr.origin = origin
-	s.prt[query.toString()] = &pr
+	self.prt[query.toString()] = &pr
 
 	// Lookup fib and forward
-	route, ok := s.fib[query.getName()]
+	route, ok := self.fib[query.getName()]
 	if ok {
 		nexthop := route.nexthop
-		fmt.Println(s.id + ": nexthop for ?" + query.toString() + " is " + nexthop)
-		of := s.ift[nexthop]
+		fmt.Println(self.id + ": nexthop for ?" + query.toString() + " is " + nexthop)
+		of := self.ift[nexthop]
 		var pkt Packet
 		pkt.query = query
 		of.out <- &pkt
@@ -122,30 +130,30 @@ func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
 }
 
 // Consume 'query' using 'result' of 'from' 
-func consumePendingRequest(s *Solver, query *Atom, result map[string]string, from *Atom) {
+func (self *Solver) consumePendingRequest(query *Atom, result map[string]string, from *Atom) {
 	// Lookup prt
-	pr, ok := s.prt[query.toString()]
+	pr, ok := self.prt[query.toString()]
 	if ok {
 		if query.toString() == from.toString() {
 			// Consume the query using its own result
-			fmt.Println(s.id + ": consume ?" + query.toString() + " with " + mapToString(result))
+			fmt.Println(self.id + ": consume ?" + query.toString() + " with " + mapToString(result))
 
 			// Delete query from prt
-			delete(s.prt, query.toString())
+			delete(self.prt, query.toString())
 
 			if pr.solve != nil {
 				// This query is a dependency of another query
-				fmt.Println(s.id + ": ?" + query.toString() + " satisfies a dependency of ?" + pr.solve.toString())
+				fmt.Println(self.id + ": ?" + query.toString() + " satisfies a dependency of ?" + pr.solve.toString())
 				// Pass the result up
-				consumePendingRequest(s, pr.solve, result, query)
+				self.consumePendingRequest(pr.solve, result, query)
 			} else {
 				// This query doesn't solve other queries
-				of := s.ift[pr.origin]  // ASSERT: pr.origin should not be empty if pr.solve is nil
+				of := self.ift[pr.origin]  // ASSERT: pr.origin should not be empty if pr.solve is nil
 				// Send result back
 				var pkt Packet
 				pkt.query = query
 				pkt.result = result
-				fmt.Println(s.id + ": send " + pkt.toString() + " back to " + pr.origin)
+				fmt.Println(self.id + ": send " + pkt.toString() + " back to " + pr.origin)
 				of.out <- &pkt
 			}
 		} else {
@@ -163,9 +171,9 @@ func consumePendingRequest(s *Solver, query *Atom, result map[string]string, fro
 			delete(pr.depend, from.toString())
 
 			if len(pr.depend) == 0 {
-				fmt.Println(s.id + ": all dependencies resolved for ?" + query.toString())
+				fmt.Println(self.id + ": all dependencies resolved for ?" + query.toString())
 				// Consume itself
-				consumePendingRequest(s, pr.query, pr.results, pr.query)
+				self.consumePendingRequest(pr.query, pr.results, pr.query)
 			}
 		}
 	}
@@ -178,17 +186,17 @@ func (self *Solver) waitForSolver(id string, f *Interface) {
 		case pkt := <-f.in:
 			if pkt.query.name == "fib" {
 				// This is a FIB announcement
-				self.processFIB(pkt, id)
+				self.processFIB(pkt)
 			} else if pkt.result == nil { // This is a request packet
 				fmt.Println(self.id + ": ?" + pkt.query.toString() + " from " + id)
 
 				// Recursively solve and forward
-				solveAndForward(self, id, pkt.query, nil)
+				self.solveAndForward(id, pkt.query, nil)
 			} else { // This is a response packet
 				fmt.Println(self.id + ": " + pkt.toString() + " from " + id)
 
 				// Recursively consume the requests
-				consumePendingRequest(self, pkt.query, pkt.result, pkt.query)
+				self.consumePendingRequest(pkt.query, pkt.result, pkt.query)
 			}
 		case <-time.After(time.Second * 2):
 			for addr, route := range self.fib {
@@ -213,12 +221,12 @@ func (self *Solver) waitForNonSolver(id string, f *Interface) {
 			fmt.Println(self.id + ": ?" + pkt.query.toString() + " from " + id)
 
 			// Recursively solve and forward
-			solveAndForward(self, id, pkt.query, nil)
+			self.solveAndForward(id, pkt.query, nil)
 		} else { // This is a response packet
 			fmt.Println(self.id + ": " + pkt.toString() + " from " + id)
 
 			// Recursively consume the requests
-			consumePendingRequest(self, pkt.query, pkt.result, pkt.query)
+			self.consumePendingRequest(pkt.query, pkt.result, pkt.query)
 		}
 	}
 }

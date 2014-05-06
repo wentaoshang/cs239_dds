@@ -1,6 +1,7 @@
 package main
 
 import "fmt"
+import "strings"
 import "strconv"
 
 type Route struct {
@@ -17,7 +18,7 @@ func createRoute(nexthop string, metric int) *Route {
 
 // Implement a minimized RIP routing protocol
 
-func (self *Solver) processFIB(pkt *Packet, from string) {
+func (self *Solver) processFIB(pkt *Packet) {
 	addr := pkt.query.args[0]
 	nexthop := pkt.query.args[1]
 	metric, _ := strconv.Atoi(pkt.query.args[2])
@@ -33,12 +34,17 @@ func (self *Solver) processFIB(pkt *Packet, from string) {
 		// Add the new route
 		self.fib[addr] = createRoute(nexthop, metric)
 		fmt.Println(self.id + ": insert FIB " + addr + " -> " + nexthop + ", metric=" + strconv.Itoa(metric))
-		// TODO: triggered update
+		// Triggered update
+		for i, _ := range self.ift {
+			if i != nexthop && strings.HasPrefix(i, "s") {
+				self.announceFIB(i, addr, metric)
+			}
+		}
 	}
 }
 
 func (self *Solver) announceFIB(id string, addr string, metric int) {
-	fmt.Println(self.id + ": announce FIB for " + addr + ", metric=" + strconv.Itoa(metric) + " to " + id)
+	fmt.Println(self.id + ": announce FIB " + addr + " -> " + self.id + ", metric=" + strconv.Itoa(metric) + " to " + id)
 	var pkt Packet
 	var fib Atom
 	fib.name = "fib"
@@ -51,6 +57,6 @@ func (self *Solver) announceFIB(id string, addr string, metric int) {
 	// Note: we can safely do this periodic annoucement without 
 	//       worrying about deadlock because we use buffered
 	//       channel to handle asynchronous send/receive.
-	//       It is still open question on the size of buffer.
-	//       For now it is set to 1.
+	//       The size of the buffer is determined by the size
+	//       of the network. For now it is set to 10.
 }

@@ -16,8 +16,8 @@ func createRequest(id string, query string) *Request {
 	var r Request
 	r.id = id
 	r.query = createAtom(query)
-	r.in = make(chan *Packet)
-	r.out = make(chan *Packet)
+	r.in = make(chan *Packet, 2)
+	r.out = make(chan *Packet, 2)
 	r.done = make(chan int)
 	return &r
 }
