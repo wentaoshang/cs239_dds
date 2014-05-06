@@ -37,7 +37,7 @@ func (self *Atom) toString() string {
 
 func (self *Atom) getName() string {
 	var s string
-	s = self.name + "(" + strconv.Itoa(len(self.args)) + ")"
+	s = self.name + "/" + strconv.Itoa(len(self.args))
 	return s
 }
 
