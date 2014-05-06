@@ -15,8 +15,10 @@ type Interface struct {
 type PendingRequest struct {
 	query *Atom
 	solve *Atom
-	depend map[string]int  // Dependency list of rules
-	results map[string]string  // Partial unification result
+	depend map[string]int  // Dependency list of rules, the int value is not important
+	results map[string]string  // Temporary storage for dependency results
+	compose *Atom  // Signature for the composition rule, in the form of "@(?X, ?A, ?B, ?C, ...)"
+	unify map[string]string  // Unification result
 	origin string  // For now, assume only one requester for each query
 }
 
@@ -77,6 +79,28 @@ func (self *Solver) addRequest(req *Request) {
 	go self.waitForNonSolver(req.id, self.ift[req.id])
 }
 
+// Magic function to compose a single piece of data from multiple answers.
+// sig is the signature of the compose atom defined in the rules.
+// It will take the form of "@(?X, ?A, ?B, ?C)", which means ?X is composed
+// by concatenating answers for ?A, ?B, and ?C.
+// We only define concatenation semantics for simplicity. Ideally this could 
+// be any user-defined functions as long as they have the same function type.
+func compose(sig *Atom, results map[string]string) (v string, ans string) {
+	v = sig.args[0]  // Variable to be composed is listed in front
+	ans = "{"
+	for i := 1; i < len(sig.args); i++ {
+		vdeps := sig.args[i]  // Dependent variable
+		ans += results[vdeps]  // It is an error if vdeps doesn't appear in results
+		// Remove vdeps from results
+		delete(results, vdeps)
+		if i != len(sig.args) - 1 {
+			ans += " | "  // Composition separator
+		}
+	}
+	ans += "}"
+	return
+}
+
 func (self *Solver) solveAndForward(origin string, query *Atom, solve *Atom) {
 	// Lookup rule cache
 	foundRule := false
@@ -90,10 +114,16 @@ func (self *Solver) solveAndForward(origin string, query *Atom, solve *Atom) {
 			pr.query = query
 			pr.solve = solve
 			pr.depend = make(map[string]int)
+			pr.results = make(map[string]string)
 			for i, a := range rule.body {
-				pr.depend[a.toString()] = i
+				if a.name == "@" {
+					// For now only one composition rule is allowed
+					pr.compose = a
+				} else {
+					pr.depend[a.toString()] = i
+				}
 			}
-			pr.results = res
+			pr.unify = res
 			pr.origin = origin
 			self.prt[query.toString()] = &pr
 
@@ -141,37 +171,53 @@ func (self *Solver) consumePendingRequest(query *Atom, result map[string]string,
 			// Delete query from prt
 			delete(self.prt, query.toString())
 
+			if pr.compose != nil {
+				// Need to compose multiple results
+				v, res := compose(pr.compose, result)
+				// Store the composed result
+				result[v] = res
+			}
+
 			if pr.solve != nil {
 				// This query is a dependency of another query
-				fmt.Println(self.id + ": ?" + query.toString() + " satisfies a dependency of ?" + pr.solve.toString())
+				//fmt.Println(self.id + ": " + query.toString() + " -> " + mapToString(result) + " satisfies a dependency of ?" + pr.solve.toString())
 				// Pass the result up
 				self.consumePendingRequest(pr.solve, result, query)
 			} else {
 				// This query doesn't solve other queries
-				of := self.ift[pr.origin]  // ASSERT: pr.origin should not be empty if pr.solve is nil
+				if pr.unify == nil {
+					// Directly send back the result
+					pr.unify = result
+				} else {
+					// Unify the original query with the result
+					for key, val := range pr.unify {
+						if val2, ok := result[val]; ok {
+							pr.unify[key] = val2
+						}
+					}
+				}
+
 				// Send result back
+				of := self.ift[pr.origin]  // ASSERT: pr.origin should not be empty if pr.solve is nil
 				var pkt Packet
 				pkt.query = query
-				pkt.result = result
+				pkt.result = pr.unify
 				fmt.Println(self.id + ": send " + pkt.toString() + " back to " + pr.origin)
 				of.out <- &pkt
 			}
 		} else {
 			// A dependency is resolved
+			fmt.Println(self.id + ": " + from.toString() + " -> " + mapToString(result) + " satisfies a dependency of ?" + pr.query.toString())
 			// Copy the result and clear the dependency
-			if pr.results == nil {
-				pr.results = result
-			} else {
-				for key, val := range pr.results {
-					if val2, ok := result[val]; ok {
-						pr.results[key] = val2
-					}
-				}
+			for key, val := range result {
+				pr.results[key] = val
 			}
 			delete(pr.depend, from.toString())
 
+			fmt.Println(self.id + ": dependency results are " + mapToString(pr.results))
+
 			if len(pr.depend) == 0 {
-				fmt.Println(self.id + ": all dependencies resolved for ?" + query.toString())
+				fmt.Println(self.id + ": all dependencies resolved ?" + query.toString() + " with " + mapToString(pr.results))
 				// Consume itself
 				self.consumePendingRequest(pr.query, pr.results, pr.query)
 			}

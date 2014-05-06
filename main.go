@@ -25,26 +25,33 @@ func main() {
 	}
 	d1 := createSource("d1", rules)
 
+	rules2 := []string{"price($5)."}
+	d2 := createSource("d2", rules2)
+
 	// Configure FIB in solvers
 	//s1.addForwardingEntry(d1.cname, s2)
 
 	//s1.addRule("loc(?X) <- loc2(?X).")
 	//s1.addRule("loc2(?L) <- location(?L).")
 
+	s1.addRule("item(?X) <- price(?P), location(?L), @(?X, ?P, ?L).")
+
 	// Create request
-	r1 := createRequest("r1", "location(?X)")
+	r1 := createRequest("r1", "item(?X)")
 
 	// Start goroutines
 	go d1.run()
+	go d2.run()
 	go s1.run()
 	go s2.run()
 	go s3.run()
 
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 2)
 	// Add data sources to solvers
 	s3.addSource(d1)
+	s2.addSource(d2)
 
-	time.Sleep(time.Second * 10)
+	time.Sleep(time.Second * 5)
 	// Add request to a solver
 	s1.addRequest(r1)
 	go r1.run()

@@ -1,5 +1,6 @@
 package main
 
+//import "fmt"
 import "strings"
 import "strconv"
 
@@ -68,7 +69,7 @@ func createRule(rule string) *Rule {
 
 	if len(ss) > 1 {
 		body := strings.Trim(ss[1], ". ")
-		args := strings.Split(body, ",")
+		args := strings.Split(body, "),")  //XXX: hack!
 		var atoms [](*Atom)
 		for _, arg := range args {
 			atoms = append(atoms, createAtom(strings.Trim(arg, "\" ")))
