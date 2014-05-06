@@ -11,8 +11,8 @@ type Link struct {
 func createLink(id string) *Link {
 	var l Link
 	l.id = id
-	l.c1 = make(chan *Packet)
-	l.c2 = make(chan *Packet)
+	l.c1 = make(chan *Packet, 1)
+	l.c2 = make(chan *Packet, 1)
 	return &l
 }
 

@@ -1,6 +1,9 @@
 package main
 
 import "fmt"
+import "time"
+import "strconv"
+import "strings"
 
 // Abstraction for distributed Datalog Solver
 
@@ -20,7 +23,7 @@ type PendingRequest struct {
 type Solver struct {
 	id string
 	rc [](*Rule)  // Rule cache
-	fib map[string]string  // FIB
+	fib map[string](*Route)  // FIB
 	prt map[string](*PendingRequest)  // Pending request table
 	ift map[string](*Interface)  // Interface table
 }
@@ -28,7 +31,7 @@ type Solver struct {
 func createSolver(id string) *Solver {
 	var s Solver
 	s.id = id
-	s.fib = make(map[string]string)
+	s.fib = make(map[string](*Route))
 	s.prt = make(map[string](*PendingRequest))
 	s.ift = make(map[string](*Interface))
 	return &s
@@ -43,7 +46,7 @@ func (self *Solver) addInterface(id string, in chan *Packet, out chan *Packet) {
 
 func (self *Solver) addSource(src *Source) {
 	self.addInterface(src.id, src.out, src.in)
-	self.fib[src.cname] = src.id
+	self.fib[src.cname] = createRoute(src.id, 0)  // Attached source has a routing metric of 0
 	fmt.Println(self.id + ": add data source " + src.cname)
 }
 
@@ -53,13 +56,13 @@ func (self *Solver) addRule(r string) {
 	fmt.Println(self.id + ": add rule " + rule.toString())
 }
 
-func (self *Solver) addForwardingEntry(cname string, nexthop *Solver) {
+func (self *Solver) addForwardingEntry(cname string, nexthop *Solver, metric int) {
 	if _, ok := self.ift[nexthop.id]; !ok {
 		// Don't add this fib entry if the nexthop is not in link table
 		return
 	}
-	self.fib[cname] = nexthop.id
-	fmt.Println(self.id + ": add forwarding entry " + cname + " -> " + nexthop.id)
+	self.fib[cname] = createRoute(nexthop.id, metric)
+	fmt.Println(self.id + ": add forwarding entry " + cname + " -> " + nexthop.id + ", metric=" + strconv.Itoa(metric))
 }
 
 func (self *Solver) addRequest(req *Request) {
@@ -107,8 +110,9 @@ func solveAndForward(s *Solver, origin string, query *Atom, solve *Atom) {
 	s.prt[query.toString()] = &pr
 
 	// Lookup fib and forward
-	nexthop, ok := s.fib[query.getName()]
+	route, ok := s.fib[query.getName()]
 	if ok {
+		nexthop := route.nexthop
 		fmt.Println(s.id + ": nexthop for ?" + query.toString() + " is " + nexthop)
 		of := s.ift[nexthop]
 		var pkt Packet
@@ -167,23 +171,65 @@ func consumePendingRequest(s *Solver, query *Atom, result map[string]string, fro
 	}
 }
 
-func (self *Solver) run() {
-	for id, f := range self.ift {
-		go func(id string, f *Interface) {
-			pkt := <-f.in
-
-			if pkt.result == nil { // This is request packet
+func (self *Solver) waitForSolver(id string, f *Interface) {
+	for {  // Infinite loop
+		//fmt.Println(self.id + ": loop on interface to " + id)
+		select {
+		case pkt := <-f.in:
+			if pkt.query.name == "fib" {
+				// This is a FIB announcement
+				self.processFIB(pkt, id)
+			} else if pkt.result == nil { // This is a request packet
 				fmt.Println(self.id + ": ?" + pkt.query.toString() + " from " + id)
 
 				// Recursively solve and forward
 				solveAndForward(self, id, pkt.query, nil)
-
-			} else { // This is response packet
+			} else { // This is a response packet
 				fmt.Println(self.id + ": " + pkt.toString() + " from " + id)
 
 				// Recursively consume the requests
 				consumePendingRequest(self, pkt.query, pkt.result, pkt.query)
 			}
-		}(id, f)
+		case <-time.After(time.Second * 2):
+			for addr, route := range self.fib {
+				if route.nexthop == id {
+					// Split-horizon
+					continue;
+				}
+
+				// Add 1 to the metric when making annoucement
+				self.announceFIB(id, addr, route.metric + 1)
+			}
+		}
+	}
+}
+
+func (self *Solver) waitForNonSolver(id string, f *Interface) {
+	// For requester and data source, just do blocking recv
+	for {  // Infinite loop
+		pkt := <-f.in
+
+		if pkt.result == nil { // This is a request packet
+			fmt.Println(self.id + ": ?" + pkt.query.toString() + " from " + id)
+
+			// Recursively solve and forward
+			solveAndForward(self, id, pkt.query, nil)
+		} else { // This is a response packet
+			fmt.Println(self.id + ": " + pkt.toString() + " from " + id)
+
+			// Recursively consume the requests
+			consumePendingRequest(self, pkt.query, pkt.result, pkt.query)
+		}
+	}
+}
+
+func (self *Solver) run() {
+	for id, f := range self.ift {
+		if strings.HasPrefix(id, "s") {
+			// This is interface to a solver
+			go self.waitForSolver(id, f)
+		} else {
+			go self.waitForNonSolver(id, f)
+		}
 	}
 }

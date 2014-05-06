@@ -25,21 +25,23 @@ func createSource(id string, data []string) *Source {
 }
 
 func (self *Source) run() {
-	pkt := <-self.in
-	if pkt.query.getName() != self.cname {
-		return
-	}
-
-	fmt.Println(self.id + ": search for ?" + pkt.query.toString())
-
-	pkt.result = nil
-	for _, d := range self.data {
-		res, ok := d.unify(pkt.query)
-		if ok {
-			pkt.result = res
-			break;
+	for { // Infinite loop
+		pkt := <-self.in
+		if pkt.query.getName() != self.cname {
+			return
 		}
+
+		fmt.Println(self.id + ": search for ?" + pkt.query.toString())
+
+		pkt.result = nil
+		for _, d := range self.data {
+			res, ok := d.unify(pkt.query)
+			if ok {
+				pkt.result = res
+				break;
+			}
+		}
+		fmt.Println(self.id + ": " + pkt.resultToString())
+		self.out <- pkt
 	}
-	fmt.Println(self.id + ": " + pkt.resultToString())
-	self.out <- pkt
 }

@@ -1,7 +1,7 @@
 package main
 
 //import "fmt"
-//import "time"
+import "time"
 
 func main() {
 	// Create links
@@ -26,13 +26,13 @@ func main() {
 	s2.addSource(d1)
 
 	// Configure FIB in solvers
-	s1.addForwardingEntry(d1.cname, s2)
+	//s1.addForwardingEntry(d1.cname, s2)
 
-	s1.addRule("loc(?X) <- loc2(?X).")
-	s1.addRule("loc2(?L) <- location(?L).")
+	//s1.addRule("loc(?X) <- loc2(?X).")
+	//s1.addRule("loc2(?L) <- location(?L).")
 
 	// Create request
-	r1 := createRequest("r1", "loc(?X)")
+	r1 := createRequest("r1", "location(?X)")
 
 	// Add request to a solver
 	s1.addRequest(r1)
@@ -41,6 +41,8 @@ func main() {
 	go d1.run()
 	go s1.run()
 	go s2.run()
+
+	time.Sleep(time.Second * 10)
 	go r1.run()
 
 	// Wait for r1 to finish
