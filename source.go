@@ -41,6 +41,7 @@ func (self *Source) run() {
 				break;
 			}
 		}
+
 		fmt.Println(self.id + ": " + pkt.resultToString())
 		self.out <- pkt
 	}

@@ -156,7 +156,7 @@ func (self *Solver) solveAndForward(origin string, query *Atom, solve *Atom) {
 		var pkt Packet
 		pkt.query = query
 		of.out <- &pkt
-	}	
+	}
 }
 
 // Consume 'query' using 'result' of 'from' 
